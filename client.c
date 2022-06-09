@@ -4,11 +4,16 @@
 #include <netinet/in.h>
 
 #define MAXLEN 255
-#define PORT 3333
 
 void die(char *);
 
 int main(int argc, char **argv){
+	if(argc < 2){
+		die("no port specified");
+	}
+
+	/* port must be specified on argv */
+	int port = atoi(argv[1]);
 	char sendbuff[MAXLEN], recvbuff[MAXLEN];
 	struct sockaddr_in server_ip_port;
 	int sd, bytesent, byterecvd, server_ip_port_length = sizeof(server_ip_port);
@@ -28,7 +33,7 @@ int main(int argc, char **argv){
 	/* indico le informazioni del server */	
 	server_ip_port.sin_family = AF_INET;
 	server_ip_port.sin_addr.s_addr = inet_addr("127.0.0.1");
-	server_ip_port.sin_port = htons(PORT);
+	server_ip_port.sin_port = htons(port);
 
 	/* apro la connessione con il server, inizio quidni il 3hs */
 	if(connect(sd, (struct sockaddr *) &server_ip_port, server_ip_port_length) < 0){

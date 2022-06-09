@@ -5,12 +5,17 @@
 #include <netinet/in.h>
 
 #define MAXLEN 255
-#define PORT 3333
 #define MAXCONN 5
 
 void die(char *);
 
 int main(int argc, char **argv){
+	if(argc < 2){
+		die("no port specified");
+	}
+
+	/* port must be specified on argv */
+	int port = atoi(argv[1]);
 	char sendb[MAXLEN], recvb[MAXLEN];
 	struct sockaddr_in bind_ip_port, client_ip_port;
 	int sd, conn_sd, pid, byterec, bytesend, bind_ip_port_length = sizeof(bind_ip_port), client_ip_port_length = sizeof(client_ip_port), counter = 0;
@@ -30,14 +35,14 @@ int main(int argc, char **argv){
 	/* inserisco i dati del server che devo creare */
 	bind_ip_port.sin_family = AF_INET;
 	bind_ip_port.sin_addr.s_addr = inet_addr("127.0.0.1");
-	bind_ip_port.sin_port = htons(PORT);
+	bind_ip_port.sin_port = htons(port);
 	
 	/* faccio il bind dell'indirizzo e la porta */
 	if(bind(sd, (struct sockaddr *) &bind_ip_port, bind_ip_port_length) < 0){
 		die("bind() error");
 	}
 	
-	printf("bind() ok.\n");
+	printf("bind() ok on port %d.\n", port);
 
 	/* do il numero massimo di connessioni */
 	if(listen(sd, MAXCONN) != 0){
