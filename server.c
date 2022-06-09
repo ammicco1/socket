@@ -63,8 +63,9 @@ int main(int argc, char **argv){
 		if(pid == 0){
 			/* processo figlio che gestisce tutte le connessioni accettate dal processo padre */
 			close(sd);
+			int my_conn_sd = counter;
 
-			printf("child process handle connection no.: %d\n", counter);
+			printf("child process handle connection no.: %d\n", my_conn_sd);
 
 			/* leggo i dati mandati dal client */
 			byterec = read(conn_sd, recvb, MAXLEN);
@@ -73,7 +74,7 @@ int main(int argc, char **argv){
 				die("read() error");
 			}
 
-			printf("read() ok.\n%d byte received: %s\n", byterec, recvb);
+			printf("read() ok.\n%d byte received from %d: %s\n", byterec, my_conn_sd, recvb);
 		
 			strcpy(sendb, recvb);
 
