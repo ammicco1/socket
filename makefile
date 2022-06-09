@@ -1,9 +1,7 @@
 ARGS = -Wall -ansi -pedantic
 
-client: client.c
+client server: client.c server.c
 	gcc ${ARGS} -o client client.c
-
-server: server.c
 	gcc ${ARGS} -o server server.c
 
 clean: 
