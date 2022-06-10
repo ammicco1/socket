@@ -1,4 +1,4 @@
+.gitignore
 client
 server
 *.swp
-.gitignore
