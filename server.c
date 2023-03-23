@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
@@ -33,9 +35,9 @@ int main(int argc, char **argv){
 	printf("socket() ok.\n");
 	
 	/* inserisco i dati del server che devo creare */
-	bind_ip_port.sin_family = AF_INET;
-	bind_ip_port.sin_addr.s_addr = inet_addr("127.0.0.1");
-	bind_ip_port.sin_port = htons(port);
+	bind_ip_port.sin_family 		= AF_INET;
+	bind_ip_port.sin_addr.s_addr 	= inet_addr("127.0.0.1");
+	bind_ip_port.sin_port 			= htons(port);
 	
 	/* faccio il bind dell'indirizzo e la porta */
 	if(bind(sd, (struct sockaddr *) &bind_ip_port, bind_ip_port_length) < 0){
@@ -54,7 +56,7 @@ int main(int argc, char **argv){
 	/* in un ciclo gestisco i client */
 	while(1){
 		/* accetto la connessione da un client e inizio il 3hs */
-		conn_sd = accept(sd, (struct sockaddr *) &client_ip_port, &client_ip_port_length);
+		conn_sd = accept(sd, (struct sockaddr *) &client_ip_port, (socklen_t *)  &client_ip_port_length);
 
 		if(conn_sd < 0){
 			die("accept() error");
