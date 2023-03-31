@@ -8,73 +8,90 @@
 #include <netinet/in.h>
 
 #define MAXLEN 255
+#define OPT_LIST "p:a:s:vh"
 
-void die(char *);
+static void _quit(char *error){
+	fputs(error, stderr);
+	
+	exit(1);
+}
+
+static void _log(char *log){
+	fputs(log, stderr);
+}
+
+static void _help(){
+	fputs("Usage: ./client [-p] - specify port for the server (default is 3000)\n\t\t\
+[-a] - specify address for the server (default is localhost)\n\t\t\
+[-s] - specify the string to send for echo\n\t\t\
+[-v] - show logs\n", stdout);
+}
 
 int main(int argc, char **argv){
-	if(argc < 2){
-		die("no port specified");
-	}
+	int port = 3000, opt, sd, bytes, server_addr_len, sflag = 0, vflag = 0;
+	char buff[MAXLEN], *addr = NULL;
+	struct sockaddr_in server_addr;
 
-	/* port must be specified on argv */
-	int port = atoi(argv[1]);
-	char sendbuff[MAXLEN], recvbuff[MAXLEN];
-	struct sockaddr_in server_ip_port;
-	int sd, bytesent, byterecvd, server_ip_port_length = sizeof(server_ip_port);
+	memset(buff, 0, MAXLEN);
+
+	while((opt = getopt(argc, argv, OPT_LIST)) != -1){
+	   	switch(opt){
+			case 'p': port = atoi(optarg); break;
+			case 'a': addr = optarg; break;
+			case 's': sflag = 1; strcpy(buff, optarg); strcat(buff, "\n"); break;
+			case 'v': vflag = 1; break;
+			case 'h': _help(); exit(0);
+	   	}
+	}
 	
-	memset(sendbuff, 0, MAXLEN);
-	memset(recvbuff, 0, MAXLEN);
-	
-	/* creo la socket */
+	/* create socket */
 	sd = socket(AF_INET, SOCK_STREAM, 0);
 
 	if(sd < 0){
-		die("socket() error");
+		_quit("socket() error.\n");
 	}
 
-	printf("socket() ok.\n");
+	if(vflag){_log("socket() ok.\n");}
 
-	/* indico le informazioni del server */	
-	server_ip_port.sin_family = AF_INET;
-	server_ip_port.sin_addr.s_addr = inet_addr("127.0.0.1");
-	server_ip_port.sin_port = htons(port);
+	/* set server's address and port */	
+	server_addr_len = sizeof(server_addr);
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_addr.s_addr = addr ? inet_addr(addr) : inet_addr("127.0.0.1");
+	server_addr.sin_port = htons(port);
 
-	/* apro la connessione con il server, inizio quidni il 3hs */
-	if(connect(sd, (struct sockaddr *) &server_ip_port, server_ip_port_length) < 0){
-		die("connect() error");
+	/* open connection */
+	if(connect(sd, (struct sockaddr *) &server_addr, server_addr_len) < 0){
+		_quit("connect() error.\n");
 	}
 
-	printf("connect() ok.\n");
+	if(vflag){_log("connect() ok.\n");}
 
-	printf("Inserisci stringa: ");
-	gets(sendbuff);
-	
-	/* mando la stringa al server */
-	bytesent = write(sd, sendbuff, MAXLEN);
-
-	if(bytesent <= 0){
-		die("sendto() error");
+	if(!sflag){
+		fputs("Insert string: ", stdout);
+		fgets(buff, MAXLEN, stdin);
 	}
 
-	printf("%d byte sent.\n", bytesent);
+	/* send string to server */
+	bytes = write(sd, buff, MAXLEN);
 
-	/* ricevo i dati dal server */	
-	byterecvd = read(sd, recvbuff, MAXLEN);
-
-	if(byterecvd <= 0){
-		die("recvfrom() error");
+	if(bytes <= 0){
+		_quit("write() error.\n");
 	}
 
-	printf("%d byte received.\n%s\n", byterecvd, recvbuff);
-	
-	/* chiudo la connessione */
+	if(vflag){fprintf(stderr, "%d byte sent to server.\n", bytes);}
+
+	/* read response from server */	
+	bytes = read(sd, buff, MAXLEN);
+
+	if(bytes <= 0){
+		_quit("read() error.\n");
+	}
+
+	if(vflag){fprintf(stderr, "%d byte received from server.\n", bytes);}
+	printf("Echo: %s", buff);
+
+	/* close connection */
 	close(sd);	
 
 	return 0;
-}
-
-void die(char *error){
-	fprintf(stderr, "%s.\n", error);
-	
-	exit(1);
 }

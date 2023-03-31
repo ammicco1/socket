@@ -1,4 +1,4 @@
-ARGS = -Wall -ansi -pedantic
+ARGS = -Wall -pedantic
 
 client server: client.c server.c
 	gcc ${ARGS} -o client client.c
