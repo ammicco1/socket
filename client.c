@@ -2,12 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <string.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#define MAXLEN 255
+#define MAX_BUFF_LEN 255
 #define OPT_LIST "p:a:s:vh"
 
 static void _quit(char *error){
@@ -21,18 +20,23 @@ static void _log(char *log){
 }
 
 static void _help(){
-	fputs("Usage: ./client [-p] - specify port for the server (default is 3000)\n\t\t\
-[-a] - specify address for the server (default is localhost)\n\t\t\
-[-s] - specify the string to send for echo\n\t\t\
-[-v] - show logs\n", stdout);
+	fputs("Usage: ./client\n\
+Options: \n\t\
+[-p] - specify port for the server (default is 3000)\n\t\
+[-a] - specify address for the server (default is localhost)\n\t\
+[-s] - specify the string to send for echo\n\t\
+[-v] - show logs\n\t\
+[-h] - show this help\n", stdout);
 }
 
 int main(int argc, char **argv){
-	int port = 3000, opt, sd, bytes, server_addr_len, sflag = 0, vflag = 0;
-	char buff[MAXLEN], *addr = NULL;
+	int port = 3000, server_sd, server_addr_len, 
+	bytes,
+	opt, sflag = 0, vflag = 0;
+	char buff[MAX_BUFF_LEN], *addr = NULL;
 	struct sockaddr_in server_addr;
 
-	memset(buff, 0, MAXLEN);
+	memset(buff, 0, MAX_BUFF_LEN);
 
 	while((opt = getopt(argc, argv, OPT_LIST)) != -1){
 	   	switch(opt){
@@ -45,22 +49,22 @@ int main(int argc, char **argv){
 	}
 	
 	/* create socket */
-	sd = socket(AF_INET, SOCK_STREAM, 0);
+	server_sd = socket(AF_INET, SOCK_STREAM, 0);
 
-	if(sd < 0){
+	if(server_sd < 0){
 		_quit("socket() error.\n");
 	}
 
 	if(vflag){_log("socket() ok.\n");}
 
 	/* set server's address and port */	
-	server_addr_len = sizeof(server_addr);
-	server_addr.sin_family = AF_INET;
+	server_addr_len 			= sizeof(server_addr);
+	server_addr.sin_family 		= AF_INET;
 	server_addr.sin_addr.s_addr = addr ? inet_addr(addr) : inet_addr("127.0.0.1");
-	server_addr.sin_port = htons(port);
+	server_addr.sin_port 		= htons(port);
 
 	/* open connection */
-	if(connect(sd, (struct sockaddr *) &server_addr, server_addr_len) < 0){
+	if(connect(server_sd, (struct sockaddr *) &server_addr, server_addr_len) < 0){
 		_quit("connect() error.\n");
 	}
 
@@ -68,30 +72,30 @@ int main(int argc, char **argv){
 
 	if(!sflag){
 		fputs("Insert string: ", stdout);
-		fgets(buff, MAXLEN, stdin);
+		fgets(buff, MAX_BUFF_LEN, stdin);
 	}
 
 	/* send string to server */
-	bytes = write(sd, buff, MAXLEN);
+	bytes = write(server_sd, buff, MAX_BUFF_LEN);
 
 	if(bytes <= 0){
 		_quit("write() error.\n");
 	}
 
-	if(vflag){fprintf(stderr, "%d byte sent to server.\n", bytes);}
+	if(vflag){fprintf(stderr, "%d bytes sent to server.\n", bytes);}
 
 	/* read response from server */	
-	bytes = read(sd, buff, MAXLEN);
+	bytes = read(server_sd, buff, MAX_BUFF_LEN);
 
 	if(bytes <= 0){
 		_quit("read() error.\n");
 	}
 
-	if(vflag){fprintf(stderr, "%d byte received from server.\n", bytes);}
+	if(vflag){fprintf(stderr, "%d bytes received from server.\n", bytes);}
 	printf("Echo: %s", buff);
 
 	/* close connection */
-	close(sd);	
+	close(server_sd);	
 
 	return 0;
 }

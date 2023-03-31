@@ -2,118 +2,136 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <string.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#define MAXLEN 255
-#define MAXCONN 5
+#define MAX_BUFF_LEN 255
+#define MAX_CLIENT 5
+#define OPT_LIST "p:a:vh"
 
-void die(char *);
+static void _quit(char *error){
+	fputs(error, stderr);
+	
+	exit(1);
+}
+
+static void _log(char *log){
+	fputs(log, stderr);
+}
+
+static void _help(){
+	fputs("Usage: ./server \n\
+Options: \n\t\
+[-p] - specify port to bind (default is 3000)\n\t\
+[-a] - specify address to bind (default is localhost)\n\t\
+[-v] - show logs\n\t\
+[-h] - show this help\n", stdout);
+}
 
 int main(int argc, char **argv){
-	if(argc < 2){
-		die("no port specified");
+	int port = 3000, server_sd, client_sd, bytes, server_addr_len, client_addr_len, 
+	counter = 0,
+	pid,
+	opt, vflag = 0;
+	char buff[MAX_BUFF_LEN], *addr = NULL;
+	struct sockaddr_in server_addr, client_addr;
+
+	memset(buff, 0, MAX_BUFF_LEN);
+
+	while((opt = getopt(argc, argv, OPT_LIST)) != -1){
+		switch(opt){
+			case 'p': port = atoi(optarg); break; 
+			case 'a': addr = optarg; break;
+			case 'v': vflag = 1; break;
+			case 'h': _help(); exit(0);
+		}
 	}
 
-	/* port must be specified on argv */
-	int port = atoi(argv[1]);
-	char sendb[MAXLEN], recvb[MAXLEN];
-	struct sockaddr_in bind_ip_port, client_ip_port;
-	int sd, conn_sd, pid, byterec, bytesend, bind_ip_port_length = sizeof(bind_ip_port), client_ip_port_length = sizeof(client_ip_port), counter = 0;
-
-	memset(sendb, 0, MAXLEN);
-	memset(recvb, 0, MAXLEN);
-
-	/* creo la socket */
-	sd = socket(AF_INET, SOCK_STREAM, 0);
+	/* create server socket */
+	server_sd = socket(AF_INET, SOCK_STREAM, 0);
 	
-	if(sd < 0){
-		die("socket() error");
+	if(server_sd < 0){
+		_quit("socket() error.\n");
 	}
 
-	printf("socket() ok.\n");
+	if(vflag){_log("socket() ok.\n");}
 	
-	/* inserisco i dati del server che devo creare */
-	bind_ip_port.sin_family 		= AF_INET;
-	bind_ip_port.sin_addr.s_addr 	= inet_addr("127.0.0.1");
-	bind_ip_port.sin_port 			= htons(port);
+	/* set server's address and port */
+	server_addr_len 			= sizeof(server_addr);
+	server_addr.sin_family 		= AF_INET;
+	server_addr.sin_addr.s_addr = addr ? inet_addr(addr) : inet_addr("127.0.0.1");
+	server_addr.sin_port 		= htons(port);
 	
-	/* faccio il bind dell'indirizzo e la porta */
-	if(bind(sd, (struct sockaddr *) &bind_ip_port, bind_ip_port_length) < 0){
-		die("bind() error");
+	/* bind address and port */
+	if(bind(server_sd, (struct sockaddr *) &server_addr, server_addr_len) < 0){
+		_quit("bind() error.\n");
 	}
 	
-	printf("bind() ok on port %d.\n", port);
+	if(vflag){_log("bind() ok.\n");}
 
-	/* do il numero massimo di connessioni */
-	if(listen(sd, MAXCONN) != 0){
-		die("listen() error");
+	/* set max number of connections */
+	if(listen(server_sd, MAX_CLIENT) != 0){
+		_quit("listen() error.\n");
 	}
 
-	printf("listen() ok.\n");
+	if(vflag){_log("listen() ok.\n");}
 
-	/* in un ciclo gestisco i client */
+	/* infinite loop for handle clients */
 	while(1){
-		/* accetto la connessione da un client e inizio il 3hs */
-		conn_sd = accept(sd, (struct sockaddr *) &client_ip_port, (socklen_t *)  &client_ip_port_length);
+		/* accept client connection */
+		client_addr_len = sizeof(client_addr);
+		client_sd = accept(server_sd, (struct sockaddr *) &client_addr, (socklen_t *)  &client_addr_len);
 
-		if(conn_sd < 0){
-			die("accept() error");
+		if(client_sd < 0){
+			_quit("accept() error.\n");
 		}
 
-		printf("accept() ok.\n");
+		if(vflag){_log("accept() ok.\n");}
+		
+		/* count connection number */
 		counter++;
 
+		/* fork a child process for handle more client simultaneously */
 		pid = fork();
 
 		if(pid == 0){
-			/* processo figlio che gestisce tutte le connessioni accettate dal processo padre */
-			close(sd);
-			int my_conn_sd = counter;
+			/* child process close server socket and handle client */
+			close(server_sd);
 
-			printf("child process handle connection no.: %d\n", my_conn_sd);
+			if(vflag){fprintf(stderr, "child process handle connection no.: %d.\n", counter);}
 
-			/* leggo i dati mandati dal client */
-			byterec = read(conn_sd, recvb, MAXLEN);
+			/* read from client */
+			bytes = read(client_sd, buff, MAX_BUFF_LEN);
 
-			if(byterec <= 0){
-				die("read() error");
+			if(bytes <= 0){
+				_quit("read() error");
 			}
 
-			printf("read() ok.\n%d byte received from %d: %s\n", byterec, my_conn_sd, recvb);
+			if(vflag){fprintf(stderr, "%d bytes received from client no. %d: %s", bytes, counter, buff);}
 		
-			strcpy(sendb, recvb);
+			/* copy message from the client and echo */
+			bytes = write(client_sd, buff, MAX_BUFF_LEN);
 
-			/* spedisco i dati al client */
-			bytesend = write(conn_sd, sendb, MAXLEN);
-
-			if(bytesend <= 0){
-				die("send() error");
+			if(bytes <= 0){
+				_quit("send() error");
 			}
 
-			printf("send() ok.\n");
+			if(vflag){fprintf(stderr, "%d bytes sent to client no. %d\n", bytes, counter);}
 
-			close(conn_sd);
-
+			/* close client socket and return from child process */
+			close(client_sd);
 			exit(0);
 		}else if(pid > 0){
-			/* processo padre, che chiude chiude il descriptor della connessione accettata, così da poter tornare ad accettare quelle che arrivano in seguito */
-			close(conn_sd);
+			/* parent process close client socket and return to accept connections */
+			close(client_sd);
 		}else{
-			die("fork() error");
+			_quit("fork() error");
 		}
 	}
 	
-	/* chiudo la socket */
-	close(sd);
+	/* close server socket */
+	close(server_sd);
 	
 	return 0;	
-}
-
-void die(char *error){
-	fprintf(stderr, "%s.\n", error);
-	
-	exit(1);
 }
